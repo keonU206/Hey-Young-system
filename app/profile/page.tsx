@@ -1,11 +1,108 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useEffect, useState, FormEvent } from "react";
+import { useCurrentUser } from "@/lib/useCurrentUser";
+
 export default function ProfilePage() {
-  // 실제 구현 시에는 서버에서 로그인한 유저 정보 불러와서 채우면 됨
-  const dummyUser = {
-    name: "김건우",
-    studentId: "202312345",
-    email: "202312345@school.ac.kr",
-    role: "학생", // 또는 "교원", "관리자"
-    department: "컴퓨터공학과",
+  const router = useRouter();
+  const { user, loading } = useCurrentUser();
+
+  // 비로그인 접근 막기
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace("/login");
+    }
+  }, [loading, user, router]);
+
+  // 비밀번호 변경용 상태
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [pwError, setPwError] = useState("");
+  const [pwSuccess, setPwSuccess] = useState("");
+  const [pwLoading, setPwLoading] = useState(false);
+
+  if (loading) {
+    return (
+      <div style={{ maxWidth: 720, margin: "0 auto" }}>
+        <p>로그인 정보를 불러오는 중입니다...</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div style={{ maxWidth: 720, margin: "0 auto" }}>
+        <p>로그인이 필요합니다. 로그인 페이지로 이동 중입니다...</p>
+      </div>
+    );
+  }
+
+  const roleLabel =
+    user.role === "ADMIN"
+      ? "관리자"
+      : user.role === "INSTRUCTOR"
+      ? "교원"
+      : "학생";
+
+  // 비밀번호 변경 제출 핸들러
+  const handleChangePassword = async (e: FormEvent) => {
+    e.preventDefault();
+    setPwError("");
+    setPwSuccess("");
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setPwError("모든 비밀번호 입력란을 채워 주세요.");
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      setPwError("새 비밀번호는 8자 이상이어야 합니다.");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPwError("새 비밀번호와 확인이 일치하지 않습니다.");
+      return;
+    }
+
+    if (newPassword === currentPassword) {
+      setPwError("현재 비밀번호와 다른 새 비밀번호를 사용해 주세요.");
+      return;
+    }
+
+    setPwLoading(true);
+    try {
+      const res = await fetch("/api/profile/change-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          loginId: user.login_id, // ✅ 현재 로그인한 유저의 학번
+          currentPassword,
+          newPassword,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!data.ok) {
+        setPwError(data.message || "비밀번호 변경에 실패했습니다.");
+        return;
+      }
+
+      setPwSuccess("비밀번호가 성공적으로 변경되었습니다.");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err) {
+      console.error(err);
+      setPwError("서버와 통신 중 오류가 발생했습니다.");
+    } finally {
+      setPwLoading(false);
+    }
   };
 
   return (
@@ -16,33 +113,34 @@ export default function ProfilePage() {
         있습니다.
       </p>
 
+      {/* 기본 정보 */}
       <section className="card">
         <h2 className="card-title">기본 정보</h2>
 
         <div className="profile-grid">
           <div className="form-field">
             <label>이름</label>
-            <input type="text" value={dummyUser.name} readOnly />
+            <input type="text" value={user.name} readOnly />
           </div>
 
           <div className="form-field">
             <label>역할</label>
-            <input type="text" value={dummyUser.role} readOnly />
+            <input type="text" value={roleLabel} readOnly />
           </div>
 
           <div className="form-field">
             <label>학번 / 사번</label>
-            <input type="text" value={dummyUser.studentId} readOnly />
+            <input type="text" value={user.login_id} readOnly />
           </div>
 
           <div className="form-field">
             <label>학과</label>
-            <input type="text" value={dummyUser.department} readOnly />
+            <input type="text" value={user.department || "미입력"} readOnly />
           </div>
 
           <div className="form-field">
             <label>이메일</label>
-            <input type="email" value={dummyUser.email} readOnly />
+            <input type="email" value={user.email} readOnly />
           </div>
         </div>
 
@@ -51,20 +149,22 @@ export default function ProfilePage() {
         </p>
       </section>
 
+      {/* 비밀번호 변경 */}
       <section className="card mt-24">
         <h2 className="card-title">비밀번호 변경</h2>
         <p className="card-desc">
-          현재 버전에서는 UI만 제공되며, 추후 백엔드와 연동하여 실제 비밀번호
-          변경 기능을 구현할 수 있습니다.
+          현재 비밀번호를 확인한 후, 새 비밀번호로 변경할 수 있습니다.
         </p>
 
-        <form className="login-form">
+        <form className="login-form" onSubmit={handleChangePassword}>
           <div className="form-field">
             <label htmlFor="currentPassword">현재 비밀번호</label>
             <input
               id="currentPassword"
               type="password"
               placeholder="현재 비밀번호를 입력하세요"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
             />
           </div>
 
@@ -73,7 +173,9 @@ export default function ProfilePage() {
             <input
               id="newPassword"
               type="password"
-              placeholder="새 비밀번호를 입력하세요"
+              placeholder="8자 이상 새 비밀번호"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
             />
           </div>
 
@@ -83,11 +185,20 @@ export default function ProfilePage() {
               id="confirmPassword"
               type="password"
               placeholder="한 번 더 입력하세요"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
             />
           </div>
 
-          <button type="button" className="btn btn-primary login-submit">
-            비밀번호 변경 (예시 버튼)
+          {pwError && <p className="form-error">{pwError}</p>}
+          {pwSuccess && <p className="form-success">{pwSuccess}</p>}
+
+          <button
+            type="submit"
+            className="btn btn-primary login-submit"
+            disabled={pwLoading}
+          >
+            {pwLoading ? "변경 중..." : "비밀번호 변경"}
           </button>
         </form>
       </section>

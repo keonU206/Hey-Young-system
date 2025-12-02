@@ -1,0 +1,230 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model appeals {
+  id                              BigInt         @id @default(autoincrement())
+  attendance_id                   BigInt
+  student_id                      BigInt
+  message                         String         @db.Text
+  status                          appeals_status @default(PENDING)
+  teacher_comment                 String?        @db.Text
+  created_at                      DateTime       @default(now()) @db.DateTime(0)
+  decided_at                      DateTime?      @db.DateTime(0)
+  decided_by                      BigInt?
+  attendances                     attendances    @relation(fields: [attendance_id], references: [id], onDelete: Cascade, map: "fk_appeals_attendance")
+  users_appeals_decided_byTousers users?         @relation("appeals_decided_byTousers", fields: [decided_by], references: [id], map: "fk_appeals_decided_by")
+  users_appeals_student_idTousers users          @relation("appeals_student_idTousers", fields: [student_id], references: [id], onDelete: Cascade, map: "fk_appeals_student")
+
+  @@index([attendance_id], map: "fk_appeals_attendance")
+  @@index([decided_by], map: "fk_appeals_decided_by")
+  @@index([student_id], map: "fk_appeals_student")
+}
+
+model attendances {
+  id                                       BigInt              @id @default(autoincrement())
+  session_id                               BigInt
+  student_id                               BigInt
+  status                                   Int                 @default(0) @db.TinyInt
+  checked_at                               DateTime?           @db.DateTime(0)
+  method                                   attendances_method?
+  last_updated_by                          BigInt?
+  last_updated_at                          DateTime?           @db.DateTime(0)
+  appeals                                  appeals[]
+  users_attendances_last_updated_byTousers users?              @relation("attendances_last_updated_byTousers", fields: [last_updated_by], references: [id], map: "fk_attendances_last_updated_by")
+  class_sessions                           class_sessions      @relation(fields: [session_id], references: [id], onDelete: Cascade, map: "fk_attendances_session")
+  users_attendances_student_idTousers      users               @relation("attendances_student_idTousers", fields: [student_id], references: [id], onDelete: Cascade, map: "fk_attendances_student")
+
+  @@unique([session_id, student_id], map: "uq_attendances_session_student")
+  @@index([last_updated_by], map: "fk_attendances_last_updated_by")
+  @@index([student_id], map: "fk_attendances_student")
+}
+
+model audit_logs {
+  id          BigInt   @id @default(autoincrement())
+  actor_id    BigInt
+  target_type String   @db.VarChar(30)
+  target_id   BigInt
+  action      String   @db.VarChar(50)
+  before_data Json?
+  after_data  Json?
+  created_at  DateTime @default(now()) @db.DateTime(0)
+  users       users    @relation(fields: [actor_id], references: [id], map: "fk_audit_logs_actor")
+
+  @@index([actor_id], map: "fk_audit_logs_actor")
+}
+
+model class_sessions {
+  id                BigInt                           @id @default(autoincrement())
+  course_id         BigInt
+  week              Int
+  session_date      DateTime                         @db.Date
+  start_at          DateTime                         @db.Time(0)
+  end_at            DateTime                         @db.Time(0)
+  room              String?                          @db.VarChar(50)
+  attendance_method class_sessions_attendance_method
+  status            class_sessions_status            @default(PLANNED)
+  code_value        String?                          @db.VarChar(20)
+  created_at        DateTime                         @default(now()) @db.DateTime(0)
+  updated_at        DateTime                         @default(now()) @db.DateTime(0)
+  attendances       attendances[]
+  courses           courses                          @relation(fields: [course_id], references: [id], onDelete: Cascade, map: "fk_class_sessions_course")
+  excuse_requests   excuse_requests[]
+
+  @@index([course_id], map: "fk_class_sessions_course")
+}
+
+model courses {
+  id             BigInt           @id @default(autoincrement())
+  code           String           @db.VarChar(20)
+  title          String           @db.VarChar(100)
+  section        String?          @db.VarChar(20)
+  semester_id    BigInt
+  instructor_id  BigInt
+  room_default   String?          @db.VarChar(50)
+  created_at     DateTime         @default(now()) @db.DateTime(0)
+  updated_at     DateTime         @default(now()) @db.DateTime(0)
+  class_sessions class_sessions[]
+  users          users            @relation(fields: [instructor_id], references: [id], map: "fk_courses_instructor")
+  semesters      semesters        @relation(fields: [semester_id], references: [id], map: "fk_courses_semester")
+  enrollments    enrollments[]
+
+  @@unique([code, semester_id, section], map: "uq_courses_code_semester_section")
+  @@index([instructor_id], map: "fk_courses_instructor")
+  @@index([semester_id], map: "fk_courses_semester")
+}
+
+model enrollments {
+  id         BigInt           @id @default(autoincrement())
+  user_id    BigInt
+  course_id  BigInt
+  role       enrollments_role @default(STUDENT)
+  created_at DateTime         @default(now()) @db.DateTime(0)
+  courses    courses          @relation(fields: [course_id], references: [id], onDelete: Cascade, map: "fk_enrollments_course")
+  users      users            @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "fk_enrollments_user")
+
+  @@unique([user_id, course_id], map: "uq_enrollments_user_course")
+  @@index([course_id], map: "fk_enrollments_course")
+}
+
+model excuse_requests {
+  id                                      BigInt                 @id @default(autoincrement())
+  session_id                              BigInt
+  student_id                              BigInt
+  type                                    excuse_requests_type   @default(EXCUSE)
+  reason_code                             String?                @db.VarChar(30)
+  reason_text                             String                 @db.Text
+  file_url                                String?                @db.VarChar(255)
+  status                                  excuse_requests_status @default(PENDING)
+  created_at                              DateTime               @default(now()) @db.DateTime(0)
+  decided_at                              DateTime?              @db.DateTime(0)
+  decided_by                              BigInt?
+  users_excuse_requests_decided_byTousers users?                 @relation("excuse_requests_decided_byTousers", fields: [decided_by], references: [id], map: "fk_excuse_requests_decided_by")
+  class_sessions                          class_sessions         @relation(fields: [session_id], references: [id], onDelete: Cascade, map: "fk_excuse_requests_session")
+  users_excuse_requests_student_idTousers users                  @relation("excuse_requests_student_idTousers", fields: [student_id], references: [id], onDelete: Cascade, map: "fk_excuse_requests_student")
+
+  @@index([decided_by], map: "fk_excuse_requests_decided_by")
+  @@index([session_id], map: "fk_excuse_requests_session")
+  @@index([student_id], map: "fk_excuse_requests_student")
+}
+
+model notifications {
+  id           BigInt   @id @default(autoincrement())
+  user_id      BigInt
+  type         String   @db.VarChar(30)
+  title        String   @db.VarChar(100)
+  message      String   @db.Text
+  is_read      Boolean  @default(false)
+  related_type String?  @db.VarChar(30)
+  related_id   BigInt?
+  created_at   DateTime @default(now()) @db.DateTime(0)
+  users        users    @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "fk_notifications_user")
+
+  @@index([user_id], map: "fk_notifications_user")
+}
+
+model semesters {
+  id          BigInt    @id @default(autoincrement())
+  name        String    @unique(map: "uq_semesters_name") @db.VarChar(20)
+  start_date  DateTime  @db.Date
+  end_date    DateTime  @db.Date
+  total_weeks Int
+  created_at  DateTime  @default(now()) @db.DateTime(0)
+  updated_at  DateTime  @default(now()) @db.DateTime(0)
+  courses     courses[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model users {
+  id                                                BigInt            @id @default(autoincrement())
+  login_id                                          String            @unique(map: "uq_users_login_id") @db.VarChar(50)
+  name                                              String            @db.VarChar(50)
+  role                                              users_role
+  email                                             String            @unique(map: "email") @db.VarChar(100)
+  department                                        String?           @db.VarChar(100)
+  password_hash                                     String            @db.VarChar(255)
+  is_active                                         Boolean           @default(true)
+  created_at                                        DateTime          @default(now()) @db.DateTime(0)
+  updated_at                                        DateTime          @default(now()) @db.DateTime(0)
+  appeals_appeals_decided_byTousers                 appeals[]         @relation("appeals_decided_byTousers")
+  appeals_appeals_student_idTousers                 appeals[]         @relation("appeals_student_idTousers")
+  attendances_attendances_last_updated_byTousers    attendances[]     @relation("attendances_last_updated_byTousers")
+  attendances_attendances_student_idTousers         attendances[]     @relation("attendances_student_idTousers")
+  audit_logs                                        audit_logs[]
+  courses                                           courses[]
+  enrollments                                       enrollments[]
+  excuse_requests_excuse_requests_decided_byTousers excuse_requests[] @relation("excuse_requests_decided_byTousers")
+  excuse_requests_excuse_requests_student_idTousers excuse_requests[] @relation("excuse_requests_student_idTousers")
+  notifications                                     notifications[]
+}
+
+enum users_role {
+  ADMIN
+  INSTRUCTOR
+  STUDENT
+}
+
+enum excuse_requests_type {
+  EXCUSE
+}
+
+enum enrollments_role {
+  STUDENT
+  ASSISTANT
+}
+
+enum appeals_status {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+enum attendances_method {
+  ELECTRONIC
+  CODE
+  MANUAL
+}
+
+enum class_sessions_attendance_method {
+  ELECTRONIC
+  CODE
+  ROLL_CALL
+}
+
+enum excuse_requests_status {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum class_sessions_status {
+  PLANNED
+  OPEN
+  PAUSED
+  CLOSED
+}

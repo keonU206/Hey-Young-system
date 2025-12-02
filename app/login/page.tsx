@@ -1,22 +1,64 @@
 "use client";
 
-import Link from "next/link";
-import { FormEvent } from "react";
+import { FormEvent, useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
-  const handleSubmit = (e: FormEvent) => {
+  const router = useRouter();
+  const [studentId, setStudentId] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  // app/login/page.tsx  중 handleSubmit 내부
+
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    // TODO: 나중에 여기서 학번 기반으로 로그인 API 호출
+    setErrorMsg("");
+
+    if (!studentId.trim() || !password) {
+      setErrorMsg("학번과 비밀번호를 모두 입력해 주세요.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch("/api/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ studentId, password }),
+      });
+
+      const data = await res.json();
+
+      if (!data.ok) {
+        setErrorMsg(data.message || "로그인에 실패했습니다.");
+        return;
+      }
+
+      // ✅ 여기서 현재 로그인한 유저를 localStorage에 저장
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("currentUser", JSON.stringify(data.user));
+      }
+
+      // 역할에 따라 대시보드로 이동
+      router.push(data.redirectTo || "/student/dashboard");
+    } catch (err) {
+      console.error(err);
+      setErrorMsg("서버와 통신 중 오류가 발생했습니다.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="login-root">
-      <div className="login-card">
-        <h2 className="login-title">로그인</h2>
-        <p className="login-subtitle">
-          SmartAttend 출석 관리 시스템에 접속하려면
-          <br />
-          본인의 <strong>학번</strong>으로 로그인해주세요.
+    <div className="auth-container">
+      <div className="card auth-card">
+        <h1 className="page-title">SmartAttend 로그인</h1>
+        <p className="page-subtitle">
+          학번(또는 사번)과 비밀번호를 입력하여 출석 관리 시스템에 접속합니다.
         </p>
 
         <form className="login-form" onSubmit={handleSubmit}>
@@ -24,12 +66,10 @@ export default function LoginPage() {
             <label htmlFor="studentId">학번</label>
             <input
               id="studentId"
-              name="studentId"
               type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
               placeholder="예: 202312345"
-              required
+              value={studentId}
+              onChange={(e) => setStudentId(e.target.value)}
             />
           </div>
 
@@ -39,26 +79,28 @@ export default function LoginPage() {
               id="password"
               type="password"
               placeholder="비밀번호를 입력하세요"
-              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
             />
           </div>
 
-          <p className="login-help">
-            현재 버전에서는 <strong>학번만으로 로그인</strong>합니다.
-            <br />
-            학번에 따라 학생 / 교원 / 관리자 권한이 구분됩니다.
-          </p>
+          {errorMsg && <p className="form-error">{errorMsg}</p>}
 
-          <button type="submit" className="btn btn-primary login-submit">
-            로그인
+          <button
+            type="submit"
+            className="btn btn-primary login-submit"
+            disabled={loading}
+          >
+            {loading ? "로그인 중..." : "로그인"}
           </button>
         </form>
 
-        <div className="login-footer">
-          <Link href="/" className="login-link">
-            ← 메인으로 돌아가기
-          </Link>
-        </div>
+        <p className="auth-helper-text">
+          아직 계정이 없으신가요?{" "}
+          <a href="/signup" className="link">
+            회원가입하기
+          </a>
+        </p>
       </div>
     </div>
   );
