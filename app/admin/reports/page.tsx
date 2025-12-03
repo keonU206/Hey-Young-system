@@ -1,66 +1,111 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { AdminGuard } from "@/components/AdminGuard";
+import { LogoutButton } from "@/components/LogoutButton";
+
+// ✅ 리포트 응답 타입 정의
+type Summary = {
+  users: {
+    total: number;
+    students: number;
+    instructors: number;
+    admins: number;
+  };
+  departments: number;
+  semesters: number;
+  courses: number;
+  class_sessions: number;
+  enrollments: number;
+  excuses: number;
+};
+
 export default function AdminReportsPage() {
+  // ✅ Summary | null 로 명시
+  const [summary, setSummary] = useState<Summary | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [errorMsg, setErrorMsg] = useState<string>("");
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await fetch("/api/admin/reports/system");
+        const data = await res.json();
+
+        if (!data.ok) {
+          setErrorMsg(data.message || "시스템 리포트를 불러오지 못했습니다.");
+          return;
+        }
+
+        setSummary(data.summary as Summary);
+      } catch (err) {
+        console.error(err);
+        setErrorMsg("서버와 통신 중 오류가 발생했습니다.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    load();
+  }, []);
+
   return (
-    <div>
-      <h1 className="page-title">리포트</h1>
-      <p className="page-subtitle">
-        과목별 출석률, 위험 학생, 공결 사용 현황 등 통계를 조회합니다.
-      </p>
+    <AdminGuard>
+      <div className="page-container">
+        <header className="page-header">
+          <div>
+            <h1 className="page-title">시스템 리포트</h1>
+            <p className="page-subtitle">
+              전체 사용자, 학과/학기/과목, 출석 관련 통계를 요약해서 보여줍니다.
+            </p>
+          </div>
+          <LogoutButton />
+        </header>
 
-      <section className="card">
-        <h2 className="card-title">과목별 출석률 요약</h2>
-        <table className="simple-table">
-          <thead>
-            <tr>
-              <th>과목명</th>
-              <th>담당 교원</th>
-              <th>출석률</th>
-              <th>결석 평균</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>웹서버프로그래밍</td>
-              <td>이교수</td>
-              <td>92%</td>
-              <td>0.3회</td>
-            </tr>
-            <tr>
-              <td>운영체제</td>
-              <td>박교수</td>
-              <td>78%</td>
-              <td>1.2회</td>
-            </tr>
-          </tbody>
-        </table>
-      </section>
+        {errorMsg && <p className="form-error mb-12">{errorMsg}</p>}
 
-      <section className="card mt-24">
-        <h2 className="card-title">위험 학생 예시</h2>
-        <table className="simple-table">
-          <thead>
-            <tr>
-              <th>학번</th>
-              <th>이름</th>
-              <th>위험 사유</th>
-              <th>관련 과목 수</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>202312345</td>
-              <td>김철수</td>
-              <td>3과목 이상에서 결석 3회 이상</td>
-              <td>3</td>
-            </tr>
-            <tr>
-              <td>202312346</td>
-              <td>이영희</td>
-              <td>지각·결석 합 8회 이상</td>
-              <td>2</td>
-            </tr>
-          </tbody>
-        </table>
-      </section>
-    </div>
+        {loading ? (
+          <p>리포트를 불러오는 중입니다...</p>
+        ) : !summary ? (
+          <p>표시할 리포트 데이터가 없습니다.</p>
+        ) : (
+          <section className="card">
+            <h2 className="card-title">시스템 요약 정보</h2>
+
+            <div className="summary-grid">
+              {/* 사용자 요약 */}
+              <div className="summary-item">
+                <h3>사용자</h3>
+                <p>전체: {summary.users.total}</p>
+                <p>학생: {summary.users.students}</p>
+                <p>교원: {summary.users.instructors}</p>
+                <p>관리자: {summary.users.admins}</p>
+              </div>
+
+              {/* 학과/학기/과목 */}
+              <div className="summary-item">
+                <h3>학과 / 학기 / 과목</h3>
+                <p>학과: {summary.departments}</p>
+                <p>학기: {summary.semesters}</p>
+                <p>과목: {summary.courses}</p>
+              </div>
+
+              {/* 출석 관련 */}
+              <div className="summary-item">
+                <h3>출석 관련</h3>
+                <p>출석 세션: {summary.class_sessions}</p>
+                <p>수강 신청: {summary.enrollments}</p>
+                <p>공결 신청: {summary.excuses}</p>
+              </div>
+            </div>
+
+            <p className="mt-16">
+              자세한 감사/오류 로그는 <strong>[감사 로그]</strong> 메뉴에서
+              확인할 수 있습니다.
+            </p>
+          </section>
+        )}
+      </div>
+    </AdminGuard>
   );
 }

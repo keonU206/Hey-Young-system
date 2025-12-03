@@ -1,4 +1,78 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
+type LogActor = {
+  id: number;
+  login_id: string;
+  name: string;
+  role: string;
+};
+
+type LogItem = {
+  id: number;
+  actor: LogActor | null;
+  target_type: string;
+  target_id: number;
+  action: string;
+  before_data: any;
+  after_data: any;
+  created_at: string; // ISO 문자열
+};
+
 export default function AdminDashboardPage() {
+  const [logs, setLogs] = useState<LogItem[]>([]);
+  const [loadingLogs, setLoadingLogs] = useState<boolean>(true);
+  const [logError, setLogError] = useState<string>("");
+
+  useEffect(() => {
+    const loadLogs = async () => {
+      try {
+        const res = await fetch("/api/admin/logs");
+        const data = await res.json();
+
+        if (!data.ok) {
+          setLogError(data.message || "최근 로그를 불러오지 못했습니다.");
+          return;
+        }
+
+        const rawLogs = (data.logs as any[]) ?? [];
+
+        const mapped: LogItem[] = rawLogs.map((l) => ({
+          id: Number(l.id),
+          actor: l.actor
+            ? {
+                id: Number(l.actor.id),
+                login_id: String(l.actor.login_id),
+                name: String(l.actor.name),
+                role: String(l.actor.role),
+              }
+            : null,
+          target_type: String(l.target_type),
+          target_id: Number(l.target_id),
+          action: String(l.action),
+          before_data: l.before_data ?? null,
+          after_data: l.after_data ?? null,
+          created_at: String(l.created_at),
+        }));
+
+        // 가장 최근 5개만 사용 (API에서도 정렬됐다고 가정하지만 한 번 더 정렬)
+        const sorted = mapped.sort(
+          (a, b) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+        setLogs(sorted.slice(0, 5));
+      } catch (err) {
+        console.error(err);
+        setLogError("서버와 통신 중 오류가 발생했습니다.");
+      } finally {
+        setLoadingLogs(false);
+      }
+    };
+
+    loadLogs();
+  }, []);
+
   return (
     <div>
       <h1 className="page-title">관리자 대시보드</h1>
@@ -37,36 +111,46 @@ export default function AdminDashboardPage() {
 
       <section className="card mt-24">
         <h2 className="card-title">최근 활동 로그</h2>
-        <table className="simple-table">
-          <thead>
-            <tr>
-              <th>시간</th>
-              <th>사용자</th>
-              <th>역할</th>
-              <th>행위</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>10:12</td>
-              <td>admin01</td>
-              <td>관리자</td>
-              <td>과목 “웹서버프로그래밍” 출석 정책 수정</td>
-            </tr>
-            <tr>
-              <td>09:40</td>
-              <td>prof_lee</td>
-              <td>교원</td>
-              <td>출석 정정 1건 승인</td>
-            </tr>
-            <tr>
-              <td>09:20</td>
-              <td>202312345</td>
-              <td>학생</td>
-              <td>로그인 성공</td>
-            </tr>
-          </tbody>
-        </table>
+
+        {logError && <p className="form-error mb-8">{logError}</p>}
+
+        {loadingLogs ? (
+          <p>최근 활동 로그를 불러오는 중입니다...</p>
+        ) : logs.length === 0 ? (
+          <p>표시할 최근 활동 로그가 없습니다.</p>
+        ) : (
+          <table className="simple-table">
+            <thead>
+              <tr>
+                <th>시간</th>
+                <th>사용자</th>
+                <th>역할</th>
+                <th>행위</th>
+              </tr>
+            </thead>
+            <tbody>
+              {logs.map((log) => (
+                <tr key={log.id}>
+                  <td>
+                    {log.created_at
+                      ? new Date(log.created_at).toLocaleString()
+                      : "-"}
+                  </td>
+                  <td>
+                    {log.actor
+                      ? `${log.actor.name} (${log.actor.login_id})`
+                      : "시스템"}
+                  </td>
+                  <td>{log.actor ? log.actor.role : "-"}</td>
+                  <td>
+                    {/* action + target 한 줄로 보기 좋게 */}
+                    {log.action} → {log.target_type} #{log.target_id}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </section>
     </div>
   );

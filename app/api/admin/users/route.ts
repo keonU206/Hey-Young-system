@@ -4,6 +4,59 @@ import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 
 /**
+ * 내부용: audit_logs에 감사 로그 기록하는 헬퍼
+ *  - actorId: 작업한 관리자(또는 시스템) id
+ *  - targetType: "USER", "POLICY", "DEPARTMENT" 등
+ *  - targetId: 대상 레코드 id
+ *  - action: "CREATE", "UPDATE", "DELETE", "ERROR_..." 등
+ *  - beforeData / afterData: 변경 전/후 스냅샷 (BigInt 넣지 말기!!)
+ */
+type AuditTargetType =
+  | "USER"
+  | "DEPARTMENT"
+  | "SEMESTER"
+  | "COURSE"
+  | "ATTENDANCE"
+  | "POLICY"
+  | "SYSTEM"
+  | "OTHER";
+
+async function logAudit(options: {
+  actorId: number | bigint | null;
+  targetType: AuditTargetType;
+  targetId: number | bigint;
+  action: string;
+  beforeData?: unknown;
+  afterData?: unknown;
+}) {
+  const { actorId, targetType, targetId, action, beforeData, afterData } =
+    options;
+
+  // BigInt 변환 유틸
+  const toBigInt = (v: number | bigint) =>
+    typeof v === "bigint" ? v : BigInt(v);
+
+  // ❌ 0n 대신 ✅ BigInt(0) 사용 (ES2020 미만에서도 타입 에러 안 나게)
+  const actorIdBigInt = actorId === null ? BigInt(0) : toBigInt(actorId);
+
+  try {
+    await prisma.audit_logs.create({
+      data: {
+        actor_id: actorIdBigInt,
+        target_type: targetType,
+        target_id: toBigInt(targetId),
+        action,
+        before_data: beforeData as any,
+        after_data: afterData as any,
+      },
+    });
+  } catch (err) {
+    // 감사로그 실패했다고 실제 기능이 깨지면 안 되므로 에러만 찍고 무시
+    console.error("audit log write error:", err);
+  }
+}
+
+/**
  * GET /api/admin/users
  *  - 전체 사용자 목록 조회
  */
@@ -27,6 +80,17 @@ export async function GET() {
     return NextResponse.json({ ok: true, users: safeUsers });
   } catch (err) {
     console.error("GET /api/admin/users error:", err);
+
+    // 필요하면 시스템 에러도 감사로그로 남길 수 있음 (선택)
+    // await logAudit({
+    //   actorId: null,
+    //   targetType: "SYSTEM",
+    //   targetId: 0,
+    //   action: "ERROR_ADMIN_USERS_GET",
+    //   beforeData: null,
+    //   afterData: { message: String(err) },
+    // });
+
     return NextResponse.json(
       { ok: false, message: "사용자 목록을 불러오는 중 오류가 발생했습니다." },
       { status: 500 }
@@ -132,9 +196,37 @@ export async function POST(req: Request) {
       created_at: created.created_at,
     };
 
+    // ✅ 감사 로그: 사용자 생성
+    await logAudit({
+      actorId: created ? admin.id : admin.id,
+      targetType: "USER",
+      targetId: created.id,
+      action: "CREATE",
+      beforeData: null,
+      afterData: {
+        login_id: created.login_id,
+        name: created.name,
+        role: created.role,
+        email: created.email,
+        department: created.department,
+        is_active: created.is_active,
+      },
+    });
+
     return NextResponse.json({ ok: true, user: safeUser });
   } catch (err) {
     console.error("POST /api/admin/users error:", err);
+
+    // 선택: 시스템 에러 로그
+    // await logAudit({
+    //   actorId: null,
+    //   targetType: "SYSTEM",
+    //   targetId: 0,
+    //   action: "ERROR_ADMIN_USERS_POST",
+    //   beforeData: null,
+    //   afterData: { message: String(err) },
+    // });
+
     return NextResponse.json(
       { ok: false, message: "사용자를 생성하는 중 오류가 발생했습니다." },
       { status: 500 }
@@ -146,7 +238,6 @@ export async function POST(req: Request) {
  * PATCH /api/admin/users
  *  - 사용자 정보/권한 수정
  *  body: { adminLoginId, id, name?, email?, department?, role?, is_active? }
- *  (비밀번호 초기화 기능 나중에 추가 가능)
  */
 export async function PATCH(req: Request) {
   try {
@@ -186,6 +277,17 @@ export async function PATCH(req: Request) {
       );
     }
 
+    // 🔎 기존 값 조회 (감사로그용)
+    const existing = await prisma.users.findUnique({
+      where: { id: BigInt(id) },
+    });
+    if (!existing) {
+      return NextResponse.json(
+        { ok: false, message: "해당 사용자를 찾을 수 없습니다." },
+        { status: 404 }
+      );
+    }
+
     const data: any = {};
     if (name !== undefined) data.name = name;
     if (email !== undefined) data.email = email;
@@ -209,9 +311,44 @@ export async function PATCH(req: Request) {
       created_at: updated.created_at,
     };
 
+    // ✅ 감사 로그: 사용자 수정 / 권한 변경
+    await logAudit({
+      actorId: admin.id,
+      targetType: "USER",
+      targetId: updated.id,
+      action: "UPDATE",
+      beforeData: {
+        login_id: existing.login_id,
+        name: existing.name,
+        role: existing.role,
+        email: existing.email,
+        department: existing.department,
+        is_active: existing.is_active,
+      },
+      afterData: {
+        login_id: updated.login_id,
+        name: updated.name,
+        role: updated.role,
+        email: updated.email,
+        department: updated.department,
+        is_active: updated.is_active,
+      },
+    });
+
     return NextResponse.json({ ok: true, user: safeUser });
   } catch (err) {
     console.error("PATCH /api/admin/users error:", err);
+
+    // 선택: 시스템 에러 로그
+    // await logAudit({
+    //   actorId: null,
+    //   targetType: "SYSTEM",
+    //   targetId: 0,
+    //   action: "ERROR_ADMIN_USERS_PATCH",
+    //   beforeData: null,
+    //   afterData: { message: String(err) },
+    // });
+
     return NextResponse.json(
       { ok: false, message: "사용자 정보를 수정하는 중 오류가 발생했습니다." },
       { status: 500 }
@@ -219,6 +356,11 @@ export async function PATCH(req: Request) {
   }
 }
 
+/**
+ * DELETE /api/admin/users
+ *  - 사용자 삭제
+ *  body: { adminLoginId, id }
+ */
 export async function DELETE(req: Request) {
   try {
     const body = await req.json().catch(() => ({} as any));
@@ -244,14 +386,53 @@ export async function DELETE(req: Request) {
       );
     }
 
+    // 🔎 기존 사용자 조회 (감사로그용)
+    const existing = await prisma.users.findUnique({
+      where: { id: BigInt(id) },
+    });
+    if (!existing) {
+      return NextResponse.json(
+        { ok: false, message: "해당 사용자를 찾을 수 없습니다." },
+        { status: 404 }
+      );
+    }
+
     // 실제 삭제 (FK 제약 있으면 여기서 에러 날 수 있음)
     await prisma.users.delete({
       where: { id: BigInt(id) },
     });
 
+    // ✅ 감사 로그: 사용자 삭제
+    await logAudit({
+      actorId: admin.id,
+      targetType: "USER",
+      targetId: existing.id,
+      action: "DELETE",
+      beforeData: {
+        login_id: existing.login_id,
+        name: existing.name,
+        role: existing.role,
+        email: existing.email,
+        department: existing.department,
+        is_active: existing.is_active,
+      },
+      afterData: null,
+    });
+
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("DELETE /api/admin/users error:", err);
+
+    // 선택: 시스템 에러 로그
+    // await logAudit({
+    //   actorId: null,
+    //   targetType: "SYSTEM",
+    //   targetId: 0,
+    //   action: "ERROR_ADMIN_USERS_DELETE",
+    //   beforeData: null,
+    //   afterData: { message: String(err) },
+    // });
+
     return NextResponse.json(
       { ok: false, message: "사용자를 삭제하는 중 오류가 발생했습니다." },
       { status: 500 }
