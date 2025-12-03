@@ -10,8 +10,6 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
-  // app/login/page.tsx  중 handleSubmit 내부
-
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
@@ -36,11 +34,6 @@ export default function LoginPage() {
       if (!data.ok) {
         setErrorMsg(data.message || "로그인에 실패했습니다.");
         return;
-      }
-
-      // ✅ 여기서 현재 로그인한 유저를 localStorage에 저장
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem("currentUser", JSON.stringify(data.user));
       }
 
       // 역할에 따라 대시보드로 이동

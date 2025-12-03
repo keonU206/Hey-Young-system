@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { LogoutButton } from "@/components/LogoutButton";
 
 export default function InstructorLayout({
   children,
@@ -36,7 +37,7 @@ export default function InstructorLayout({
           <Link href="/profile" className="role-nav-link small">
             내 정보
           </Link>
-          <button className="role-logout-btn">로그아웃</button>
+          <LogoutButton />
         </div>
       </aside>
 

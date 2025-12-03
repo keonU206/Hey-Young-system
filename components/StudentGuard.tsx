@@ -10,20 +10,14 @@ export function AdminGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const check = async () => {
       try {
-        const res = await fetch("/api/me", {
-          method: "GET",
-          credentials: "include", // ✅ 쿠키(auth_token) 확실히 포함
-        });
-
+        const res = await fetch("/api/me");
         if (!res.ok) {
           router.replace("/login");
           return;
         }
 
         const data = await res.json();
-
-        // JWT payload 기준으로 ADMIN인지 확인
-        if (!data.user || data.user.role !== "ADMIN") {
+        if (!data.user || data.user.role !== "STUDENT") {
           router.replace("/login");
           return;
         }

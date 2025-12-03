@@ -1,8 +1,6 @@
-// app/student/dashboard/page.tsx
 "use client";
 
 import { useCurrentUser } from "@/lib/useCurrentUser";
-import { LogoutButton } from "@/components/LogoutButton";
 
 export default function StudentDashboardPage() {
   const { user, loading } = useCurrentUser();
@@ -35,7 +33,6 @@ export default function StudentDashboardPage() {
             {user.name} ({user.login_id}) 님, 환영합니다 👋
           </p>
         </div>
-        <LogoutButton /> {/* ✅ 여기 */}
       </header>
 
       <section className="card">
