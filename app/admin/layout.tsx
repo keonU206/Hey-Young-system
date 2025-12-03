@@ -14,6 +14,9 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           <Link href="/admin/dashboard" className="role-nav-link">
             대시보드
           </Link>
+          <Link href="/admin/departments" className="role-nav-link">
+            학과 관리
+          </Link>
           <Link href="/admin/users" className="role-nav-link">
             사용자 관리
           </Link>
