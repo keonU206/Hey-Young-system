@@ -2,20 +2,25 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, FormEvent } from "react";
-import { useCurrentUser } from "@/lib/useCurrentUser";
+
+// /api/me 에서 내려오는 유저 타입 (payload 기준)
+type MeUser = {
+  id: number;
+  login_id: string;
+  name: string;
+  role: "ADMIN" | "INSTRUCTOR" | "STUDENT";
+  email?: string | null;
+  department?: string | null;
+};
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { user, loading } = useCurrentUser();
 
-  // 비로그인 접근 막기
-  useEffect(() => {
-    if (!loading && !user) {
-      router.replace("/login");
-    }
-  }, [loading, user, router]);
+  // 🔹 현재 로그인 유저 상태
+  const [user, setUser] = useState<MeUser | null>(null);
+  const [loadingUser, setLoadingUser] = useState(true);
 
-  // 비밀번호 변경용 상태
+  // 🔹 비밀번호 변경용 상태
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -23,7 +28,44 @@ export default function ProfilePage() {
   const [pwSuccess, setPwSuccess] = useState("");
   const [pwLoading, setPwLoading] = useState(false);
 
-  if (loading) {
+  // ✅ 마운트 시 /api/me 호출해서 로그인 유저 정보 가져오기
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const res = await fetch("/api/me", {
+          method: "GET",
+          credentials: "include", // 쿠키(auth_token) 포함
+        });
+
+        if (!res.ok) {
+          setUser(null);
+          // 바로 로그인 페이지로 보내기
+          router.replace("/login");
+          return;
+        }
+
+        const data = await res.json();
+        if (!data.user) {
+          setUser(null);
+          router.replace("/login");
+          return;
+        }
+
+        setUser(data.user as MeUser);
+      } catch (err) {
+        console.error("Failed to load /api/me:", err);
+        setUser(null);
+        router.replace("/login");
+      } finally {
+        setLoadingUser(false);
+      }
+    };
+
+    loadUser();
+  }, [router]);
+
+  // 로딩 중
+  if (loadingUser) {
     return (
       <div style={{ maxWidth: 720, margin: "0 auto" }}>
         <p>로그인 정보를 불러오는 중입니다...</p>
@@ -31,6 +73,7 @@ export default function ProfilePage() {
     );
   }
 
+  // 비로그인 상태
   if (!user) {
     return (
       <div style={{ maxWidth: 720, margin: "0 auto" }}>
@@ -46,7 +89,7 @@ export default function ProfilePage() {
       ? "교원"
       : "학생";
 
-  // 비밀번호 변경 제출 핸들러
+  // ✅ 비밀번호 변경 제출 핸들러
   const handleChangePassword = async (e: FormEvent) => {
     e.preventDefault();
     setPwError("");
@@ -80,7 +123,7 @@ export default function ProfilePage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          loginId: user.login_id, // ✅ 현재 로그인한 유저의 학번
+          loginId: user.login_id, // ✅ 현재 로그인한 유저의 학번/사번
           currentPassword,
           newPassword,
         }),
@@ -140,7 +183,7 @@ export default function ProfilePage() {
 
           <div className="form-field">
             <label>이메일</label>
-            <input type="email" value={user.email} readOnly />
+            <input type="email" value={user.email || ""} readOnly />
           </div>
         </div>
 

@@ -58,12 +58,12 @@ export default function AdminLogsPage() {
           created_at: String(l.created_at),
         }));
 
-        // 🔹 최신순 정렬 후 5개만 사용
+        // 🔹 최신순 정렬 (전체)
         const sorted = mapped.sort(
           (a, b) =>
             new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
-        setLogs(sorted.slice(0, 5));
+        setLogs(sorted);
       } catch (err) {
         console.error(err);
         setErrorMsg("서버와 통신 중 오류가 발생했습니다.");
@@ -107,48 +107,57 @@ export default function AdminLogsPage() {
           </section>
         ) : (
           <section className="card">
-            <h2 className="card-title">최근 감사 로그 (최신 5개)</h2>
+            <h2 className="card-title">전체 감사 로그</h2>
+            <p className="card-desc">
+              최근 발생한 감사 로그를 시간순으로 확인할 수 있습니다.
+            </p>
 
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>시간</th>
-                  <th>사용자</th>
-                  <th>역할</th>
-                  <th>행위</th>
-                  <th>자세히보기</th>
-                </tr>
-              </thead>
-              <tbody>
-                {logs.map((log) => (
-                  <tr key={log.id}>
-                    <td>
-                      {log.created_at
-                        ? new Date(log.created_at).toLocaleString()
-                        : "-"}
-                    </td>
-                    <td>
-                      {log.actor
-                        ? `${log.actor.name} (${log.actor.login_id})`
-                        : "시스템"}
-                    </td>
-                    <td>{log.actor ? log.actor.role : "-"}</td>
-                    <td>
-                      {log.action} → {log.target_type} #{log.target_id}
-                    </td>
-                    <td>
-                      <button
-                        type="button"
-                        className="btn btn-secondary"
-                        onClick={() => handleShowDetail(log)}
-                      >
-                        자세히보기
-                      </button>
-                    </td>
+            {/* 🔹 스크롤 가능한 테이블 래퍼 */}
+            <div className="admin-log-table-wrapper">
+              <table className="admin-table admin-log-table">
+                <thead>
+                  <tr>
+                    <th>시간</th>
+                    <th>사용자</th>
+                    <th>역할</th>
+                    <th>행위</th>
+                    <th>자세히보기</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {logs.map((log) => (
+                    <tr key={log.id}>
+                      <td>
+                        {log.created_at
+                          ? new Date(log.created_at).toLocaleString()
+                          : "-"}
+                      </td>
+                      <td>
+                        {log.actor
+                          ? `${log.actor.name} (${log.actor.login_id})`
+                          : "시스템"}
+                      </td>
+                      <td>{log.actor ? log.actor.role : "-"}</td>
+                      <td>
+                        <span className="log-action">{log.action}</span>{" "}
+                        <span className="log-target">
+                          → {log.target_type} #{log.target_id}
+                        </span>
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-log-detail"
+                          onClick={() => handleShowDetail(log)}
+                        >
+                          자세히보기
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </section>
         )}
       </div>

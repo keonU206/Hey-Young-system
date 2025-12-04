@@ -19,7 +19,7 @@ export async function signAuthToken(payload: AuthTokenPayload) {
   return await new SignJWT(payload)
     .setProtectedHeader({ alg: "HS256", typ: "JWT" })
     .setIssuedAt()
-    .setExpirationTime("5m")
+    .setExpirationTime("5m") // ✅ 5분 유지
     .sign(secret);
 }
 

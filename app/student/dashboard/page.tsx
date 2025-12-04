@@ -1,11 +1,69 @@
 "use client";
 
-import { useCurrentUser } from "@/lib/useCurrentUser";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+
+type MeUser = {
+  id: number;
+  login_id: string;
+  name: string;
+  role: "ADMIN" | "INSTRUCTOR" | "STUDENT";
+  email: string | null;
+  department: string | null;
+};
 
 export default function StudentDashboardPage() {
-  const { user, loading } = useCurrentUser();
+  const router = useRouter();
 
-  if (loading) {
+  // 🔹 현재 로그인 유저 상태
+  const [user, setUser] = useState<MeUser | null>(null);
+  const [loadingUser, setLoadingUser] = useState(true);
+
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const res = await fetch("/api/me", {
+          method: "GET",
+          credentials: "include", // ✅ JWT 쿠키(auth_token) 포함
+        });
+
+        if (!res.ok) {
+          setUser(null);
+          router.replace("/login");
+          return;
+        }
+
+        const data = await res.json();
+        if (!data.user) {
+          setUser(null);
+          router.replace("/login");
+          return;
+        }
+
+        const me = data.user as MeUser;
+
+        // 🔒 학생이 아닌 경우 접근 차단
+        if (me.role !== "STUDENT") {
+          setUser(null);
+          router.replace("/login");
+          return;
+        }
+
+        setUser(me);
+      } catch (err) {
+        console.error("Failed to load /api/me:", err);
+        setUser(null);
+        router.replace("/login");
+      } finally {
+        setLoadingUser(false);
+      }
+    };
+
+    loadUser();
+  }, [router]);
+
+  // 로딩 중
+  if (loadingUser) {
     return (
       <div className="page-container">
         <p>로그인 정보를 불러오는 중입니다...</p>
@@ -13,6 +71,7 @@ export default function StudentDashboardPage() {
     );
   }
 
+  // 비로그인 / 권한 없음
   if (!user) {
     return (
       <div className="page-container">
@@ -40,7 +99,7 @@ export default function StudentDashboardPage() {
         <ul className="info-list">
           <li>이름: {user.name}</li>
           <li>학번: {user.login_id}</li>
-          <li>이메일: {user.email}</li>
+          <li>이메일: {user.email || "미입력"}</li>
           <li>학과: {user.department || "미입력"}</li>
         </ul>
       </section>

@@ -12,7 +12,7 @@ export function AdminGuard({ children }: { children: React.ReactNode }) {
       try {
         const res = await fetch("/api/me", {
           method: "GET",
-          credentials: "include", // ✅ 쿠키(auth_token) 확실히 포함
+          credentials: "include", // ✅ 쿠키 포함
         });
 
         if (!res.ok) {
@@ -21,8 +21,6 @@ export function AdminGuard({ children }: { children: React.ReactNode }) {
         }
 
         const data = await res.json();
-
-        // JWT payload 기준으로 ADMIN인지 확인
         if (!data.user || data.user.role !== "ADMIN") {
           router.replace("/login");
           return;
@@ -38,9 +36,7 @@ export function AdminGuard({ children }: { children: React.ReactNode }) {
     check();
   }, [router]);
 
-  if (checking) {
-    return <p>접근 권한 확인 중...</p>;
-  }
+  if (checking) return <p>접근 권한 확인 중...</p>;
 
   return <>{children}</>;
 }

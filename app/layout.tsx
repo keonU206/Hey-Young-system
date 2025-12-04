@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { LegacyAuthCleaner } from "@/components/LegacyAuthCleaner";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -15,6 +16,7 @@ export default function RootLayout({
     <html lang="ko">
       <body className="app-body">
         {/* 전역 레이아웃 (헤더/푸터, 토스트 등 공통 요소는 여기서 관리) */}
+        <LegacyAuthCleaner />
         <div className="app-shell">
           <header className="app-header">
             <div className="app-header-inner">

@@ -606,3 +606,89 @@ textarea {
   border-color: #2563eb;
   box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.3);
 }
+
+/* log */
+/* 🔹 로그 테이블 전체 박스 */
+.admin-log-table-wrapper {
+  margin-top: 12px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  max-height: 480px; /* 높이 넘어가면 스크롤 */
+  overflow: auto;
+}
+
+/* 🔹 기본 admin 테이블 스타일 */
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  min-width: 720px; /* 컬럼 많으니까 살짝 넓게 */
+}
+
+.admin-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f8fafc;
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.admin-table th {
+  font-size: 13px;
+  font-weight: 600;
+  color: #4a5568;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.admin-table tbody tr:nth-child(even) {
+  background-color: #f9fafb;
+}
+
+.admin-table tbody tr:hover {
+  background-color: #edf2f7;
+}
+
+/* 🔹 로그 액션/타겟 강조 */
+.log-action {
+  font-weight: 600;
+  color: #1a202c;
+}
+
+.log-target {
+  font-size: 12px;
+  color: #718096;
+}
+
+/* 🔹 자세히보기 버튼 살짝 꾸미기 */
+.btn-log-detail {
+  padding: 6px 10px;
+  font-size: 12px;
+  border-radius: 999px;
+}
+
+/* 혹시 .btn, .btn-secondary가 없다면 예시 (있으면 생략해도 됨) */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.btn-secondary {
+  background-color: #e2e8f0;
+  color: #1a202c;
+}
+
+.btn-secondary:hover {
+  background-color: #cbd5e0;
+}
